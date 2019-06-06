@@ -1,0 +1,255 @@
+---
+title: "Cluster by Enterotype"
+output: 
+  html_notebook:
+    codes: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = F, message = F)
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+library(tibble)
+
+# pink/blue/
+grp <- c("ET_B", "ET_P")
+grp.col <- c("#FF6000", "#0080C0")
+
+stg <- c("Before", "After")
+stg.col <- c("#6288BA", "#C25D97")
+```
+
+### load data
+```{r}
+phen <- read.csv("../datset/phenotype.csv")
+gsf <- read.table("../datset/profile/Genus.profile")
+```
+
+### genus profile in before for  enterotype classification 
+[Enterotype reference](http://enterotypes.org/) attains Enterotype result
+```{r}
+before.phe <- phen %>% filter(Stage=="After")
+before.gsf <- gsf[, colnames(gsf)%in%before.phe$SampleID]
+colnames(before.gsf) <- before.phe$ID
+write.table(before.gsf, "after.gsf.txt", quote = F, sep = "\t")
+
+# enterotype by network reference
+enterotype <- read.table("Enterotype_classification_network.txt",
+                         header = T)
+group <- inner_join(before.phe %>% select(ID),
+                    enterotype %>% rownames_to_column("ID") %>%
+                      select(ID, ET),
+                    by="ID") %>% 
+  dplyr::rename(Group=ET)
+
+phe.grp <- inner_join(group %>% select(ID, Group), 
+                      phen, by = "ID") %>%
+  mutate(Group = factor(Group, levels = grp),
+         Stage = factor(Stage, levels = stg))
+
+```
+
+### PERMANOVA 
+
+validate that the enterotype is significantly differet
+```{r}
+idx <- c("SampleID", "ID", "Group", "Gender", "BMI", "Weight", "Age")
+before.grp <- phe.grp %>% filter(Stage=="Before") %>% 
+          select(one_of(idx))
+
+PermProf <- function(x, y) {
+  sid <- intersect(as.character(x$SampleID), colnames(y)) 
+  phe <- x %>% filter(SampleID %in% sid) 
+  prf <-  y %>% select(as.character(phe$SampleID)) %>%
+          t() %>% data.frame()
+  
+  per <- apply(phe %>% select(-one_of("SampleID")), 2, function(a, pf){
+    dat <- data.frame(value = a, pf)
+      datphe <- dat$value
+      if (length(datphe) == 0 | unique(datphe) == 1) {
+        res <- data.frame(length(datphe), rep(NA, 6))
+        next
+      }
+      
+      if (length(unique(datphe)) < 6) {
+        datphe <- as.factor(datphe)
+      } 
+      datprf <- dat[, -1, F] 
+      library(vegan)
+      dis <- vegdist(datprf, method = "bray")
+      
+      set.seed(123)
+      ad <- adonis(dis ~ datphe, permutations = 1000)
+      tmp <- as.data.frame(ad$aov.tab) %>% slice(1)
+      res <- c(length(datphe), as.numeric(tmp[, c(1:6)]))
+      return(res)
+    }, prf) %>% t() %>% data.frame()
+    
+  colnames(per) <- c("SumsOfSample", "Df", "SumsOfSqs", 
+                       "MeanSqs", "F.Model", "R2", "Pr(>F)")
+  
+  per$FDR <- p.adjust(per$`Pr(>F)`, method = "BH")
+  
+  return(per)
+}
+
+before.per <- PermProf(before.grp, gsf)
+```
+
+
+### Function 
+```{r}
+# subject information
+CohortInform <- function(x){
+  dat <- x %>% filter(Stage%in%stg[1]) %>% 
+    select(ID, Age, Sex, Weight, BMI)
+  name <- "cohort\nMean+/-SD"
+  res <- dat %>% 
+      summarise(
+        `Number of subjects (n)` = length(ID),
+        Sex = paste(paste0("F:", 
+        round((length(Sex[Sex=="F"])/length(Sex)), 4)*100, "%"),
+            paste0("M:", 
+        round((length(Sex[Sex=="M"])/length(Sex)), 4)*100, "%")), 
+        Age = paste0(round(mean(Age), 2), "+/-", round(sd(Age), 2)),
+        Weight = paste0(round(mean(Weight), 2), "+/-", round(sd(Weight), 2)),
+        BMI = paste0(round(mean(BMI), 2), "+/-", round(sd(BMI), 2))) %>% 
+        t() %>% data.frame() %>% 
+        setNames(name)
+    
+   return(res)
+}
+
+# Number of subject/Sex/Age/Weight/BMI
+CohortNum <- function(x, tag){
+ 
+  dat <- x %>% filter(Stage%in%stg[1]& Group%in%tag) %>% 
+    select(ID, Age, Sex, Weight, BMI)
+  name <- paste(tag, "cohort\nMean+/-SD")
+
+  res <- dat %>% 
+      summarise(
+        `Number of subjects (n)` = length(ID),
+        Sex = paste(paste0("F:", 
+                round((length(Sex[Sex=="F"])/length(Sex)), 4)*100, "%"),
+            paste0("M:", 
+                round((length(Sex[Sex=="M"])/length(Sex)), 4)*100, "%")), 
+        Age = paste0(round(mean(Age), 2), "+/-", round(sd(Age), 2)),
+        Weight = paste0(round(mean(Weight), 2), "+/-", round(sd(Weight), 2)),
+        BMI = paste0(round(mean(BMI), 2), "+/-", round(sd(BMI), 2))) %>% 
+        t() %>% data.frame() %>% 
+        setNames(name)
+    
+   return(res)
+}
+
+# pvalue of Sex/Age/Weight/BMI
+CohortP <- function(x){
+  dat <- x %>% filter(Stage%in%stg[1]) %>% 
+    select(Age, Sex, Weight, BMI, Group)
+  
+  dat.cas <- dat %>% filter(Group%in%grp[1]) %>%
+    select(-Group)
+  dat.con <- dat %>% filter(Group%in%grp[2]) %>%
+    select(-Group)
+  
+  Sex <- as.table(cbind(table(dat.cas$Sex), table(dat.con$Sex)))
+  dimnames(Sex) <- list(Sex = c("F", "M"),
+                    Group = c("ET_B","ET_P"))
+    
+  p1 <- chisq.test(Sex)$p.value
+  
+  # Age
+  p2 <- wilcox.test(dat.cas$Age, dat.con$Age)$p.value
+
+  # Weight
+  p3 <- wilcox.test(dat.cas$Weight, dat.con$Weight)$p.value
+  
+  # BMI
+  p4 <- wilcox.test(dat.cas$BMI, dat.con$BMI)$p.value
+
+  p <- data.frame(
+             "Number" = nrow(dat),
+             "Sex" = p1, 
+             "Age" = p2, 
+             "Weight" = p3, 
+             "BMI" = p4) %>% 
+    t() %>% data.frame() %>%
+    setNames("cohort\nWilcox.test Chisq.test")
+}
+
+# loss
+lossFun <- function(x, tag){
+ dat <- x %>% filter(Stage%in%tag) %>% 
+        select(-one_of(c("ID","SampleID","Sex","Stage","Age")))  
+ name <- c(paste0(tag, grp, "\nMean+/-SD"), paste0(tag, " pvalue"))
+ # mean +/- sd ; p vlaue 
+  res <- apply(dat %>% select(-Group), 2, function(x){
+    # mean sd
+    md <- tapply(x, dat$Group, function(y){
+      mn <- paste( round(mean(y), 2), round(sd(y), 2), sep="+/-")
+      return(mn)
+      })
+    # p value 
+    pv <- wilcox.test(x~dat$Group)$p.value
+    res <- c(md, pv)
+    }) %>% data.frame() %>% t() %>% data.frame() %>% 
+    setNames(name) 
+  
+  return(res)
+}
+```
+
+### cohort description 
+```{r}
+cohortin <- CohortInform(phen)
+DT::datatable(cohortin)
+```
+
+### Effect of CR on BMI (kg/m^2)
+
+1. loss ratio  (before - after)*100 %
+```{r, fig.width=4, fig.height=5}
+# Weight/BMI loss   
+loss <- phe.grp %>% select(ID, Stage, BMI, Weight) %>% 
+  arrange(ID, Stage) %>% 
+  group_by(ID) %>% 
+  summarise(weight.k=(first(Weight)-last(Weight)),
+            weight.p=round((first(Weight)-last(Weight))/first(Weight), 4)*100,
+            BMI.k=(first(BMI)-last(BMI)),
+            BMI.p=round((first(BMI)-last(BMI))/first(BMI), 4)*100) %>%
+  ungroup() %>%
+  arrange(BMI.k, ID)
+
+phe.loss <- inner_join(phe.grp, loss, by="ID") %>% 
+       arrange(ID, Stage) 
+```
+
+
+### Table 1 Cohort Description in two Enterotypes
+
+ * Mean +/- SD 
+
+```{r}
+cohort.p <- CohortP(phe.loss) 
+F.des <- CohortNum(phe.loss, grp[1])
+M.des <- CohortNum(phe.loss, grp[2])
+cohort.des <- cbind(F.des, M.des)
+cohort <- cbind(cohort.des, cohort.p)
+DT::datatable(cohort)
+```
+
+### Table 2 Effect of Calorie Restriction (CR) on BMI (kg/m^2)
+```{r}
+before <- phe.loss %>% filter(Stage%in%stg[1])
+before.e <- lossFun(phe.loss, stg[1])
+after.e <- lossFun(phe.loss, stg[2])
+effect <- cbind(before.e, after.e)
+DT::datatable(effect)
+```
+
+### output phentotype with group information
+```{r}
+write.csv(phe.loss, "../datset/phenotype/phenotype.grp.csv", row.names = F)
+```

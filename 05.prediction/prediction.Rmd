@@ -1,0 +1,379 @@
+---
+title: "prediction"
+output:
+  html_notebook:
+    codes: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T, warning = F, message = F)
+library(dplyr)
+library(tibble)
+library(ggplot2)
+library(ggpubr)
+
+# pink/blue/
+grp <- c("ET_B", "ET_P")
+grp.col <- c("#FF6000", "#0080C0")
+
+stg <- c("Before", "After")
+stg.col <- c("#6288BA", "#C25D97")
+```
+
+### load data
+```{r}
+phen <- read.csv("../datset/phenotype/phenotype.grp.csv") %>% 
+        mutate(Stage=factor(Stage, levels=stg),
+              Group=factor(Group, levels = grp))
+spf <- read.table("../datset/profile/Species.profile")
+amf <- read.table("../datset/profile/Amino.profile")
+
+###########################################################
+commonTax <- function(x, 
+                      occ=0.8,
+                      abun=1e-6){
+  prf <- x %>% rownames_to_column("tmp") %>%
+    filter(tmp!="unclassed") %>% 
+    filter(apply(select(., -one_of("tmp")), 1,
+                 function(x){sum(x[!is.na(x)] > 0) / 
+                     length(x[!is.na(x)])}) > occ) %>%
+    data.frame(.) %>%
+    column_to_rownames("tmp") %>%
+    t() %>% data.frame()
+  prf.cln <- apply(prf, 2, median) %>%
+    data.frame() %>% setNames("Abundance") %>%
+    rownames_to_column("tmp") %>%
+    filter(Abundance > abun & nchar(tmp) < 60)
+  res <- as.character(prf.cln$tmp)
+  return(res)
+}
+```
+
+
+### cross validation with feature selection 
+
+1. markers select with lasso  
+2. cv to checkout the power of markers
+
+```{r}
+### species 
+Feature_sp <- function(tag, num, tag2){
+  phe <- phen %>% select(SampleID, ID, Group, Stage, BMI.p) %>%
+    filter(Group%in%tag2) %>%
+    filter(Stage=="Before")
+  tax <- commonTax(spf)
+  prf <- spf[rownames(spf)%in%tax, ] %>%
+      t() %>% data.frame() %>% rownames_to_column("SampleID")
+  mdat1 <- inner_join(phe, prf, by = "SampleID")
+  
+  
+  # select feature    
+  library(glmnet)
+  set.seed(123)
+  lasso <- cv.glmnet(x=model.matrix(~., scale(mdat1[, -c(1:ncol(phe))]) %>% data.frame()),
+                     y=scale(mdat1$BMI.p),
+                     family='gaussian',
+                     nfolds = 10,
+                     alpha = 1,
+                     nlambda = 100)
+  lasso.mk <- data.frame(as.matrix(coef(lasso, lasso$lambda.min))) %>%
+      setNames("Score") %>%
+      rownames_to_column("Type") %>%
+      slice(-c(1:2)) %>%
+      filter(Score!=0)
+  #print(lasso.mk)
+  mdat1.mk <- mdat1 %>% select(SampleID, ID, BMI.p, lasso.mk$Type)
+  
+  data_all <- mdat1.mk %>% select(-SampleID) %>%
+    column_to_rownames("ID")
+  # cross validation of feature
+  library(caret)
+  set.seed(123)
+  folds <- createFolds(y=data_all$BMI.p, k=num)
+  res <- data.frame()
+  for (i in 1:num) {
+      train_cv <- data_all[-folds[[i]], ]
+      test_cv <- data_all[folds[[i]], ]
+      if(tag=="glm"){
+        fit <- glm(BMI.p~., data=train_cv, family = "gaussian")
+      } else if(tag=="rf"){
+        library(randomForest)
+        fit <- randomForest(BMI.p~., data = train_cv, mtry=3, importance=T) 
+      } else if(tag=="gbm"){
+        library(gbm)
+        fit <- gbm(BMI.p~., data = train_cv,
+                 distribution = "gaussian",
+                 n.trees = 1000, 
+                 shrinkage = 0.01,
+                 n.minobsinnode = 1,
+                 bag.fraction = 1,
+                 interaction.depth = 8,
+                 cv.folds = 5)
+      }
+      pred <- predict(fit, test_cv) %>% data.frame() 
+      pred_res <- cbind(test_cv$BMI.p, pred) %>%
+      setNames(c("True", "Predict"))
+      res <- rbind(res, pred_res)
+  }
+  # cbind Enterotypes 
+  res.cln <- inner_join(phe %>% select(ID, Group),
+                        res %>% rownames_to_column("ID"),
+                        by = "ID")
+  return(list(res=res.cln, mk=lasso.mk))
+}
+
+Feature_aa <- function(tag2){
+  phe <- phen %>% select(SampleID, ID, Group, Stage, BMI.p) %>%
+    filter(Group%in%tag2) %>%
+    filter(Stage=="Before")
+  prf <- amf %>% t() %>% data.frame() %>% 
+    rownames_to_column("SampleID")
+  mdat1 <- inner_join(phe, prf, by = "SampleID")
+  
+  # select feature    
+  library(glmnet)
+  set.seed(123)
+  lasso <- cv.glmnet(x=model.matrix(~., mdat1[, -c(1:ncol(phe))]),
+                     y=mdat1$BMI.p,
+                     family='gaussian',
+                     nfolds = 10,
+                     alpha = 1,
+                     nlambda = 100)
+  lasso.mk <- data.frame(as.matrix(coef(lasso, lasso$lambda.min))) %>%
+      setNames("Score") %>%
+      rownames_to_column("Type") %>%
+      slice(-c(1:2)) %>%
+      filter(Score!=0)
+  print(lasso.mk)
+}
+
+Feature_bmi <- function(tag, num, tag2){
+  phe <- phen %>% select(ID, Group, Stage, BMI, BMI.p) %>%
+    filter(Group%in%tag2) %>%
+    filter(Stage=="Before")
+  
+  data_all <- phe %>% select(-one_of(c("Group", "Stage"))) %>%
+    column_to_rownames("ID")
+  # cross validation of feature
+  library(caret)
+  set.seed(123)
+  folds <- createFolds(y=data_all$BMI.p, k=num)
+  res <- data.frame()
+  for (i in 1:num) {
+      train_cv <- data_all[-folds[[i]], ]
+      test_cv <- data_all[folds[[i]], ]
+      if(tag=="glm"){
+        fit <- glm(BMI.p~., data=train_cv, family = "gaussian")
+      } else if(tag=="rf"){
+        library(randomForest)
+        fit <- randomForest(BMI.p~., data = train_cv, mtry=3, importance=T) 
+      } else if(tag=="gbm"){
+        library(gbm)
+        fit <- gbm(BMI.p~., data = train_cv,
+                 distribution = "gaussian",
+                 n.trees = 1000, 
+                 shrinkage = 0.01,
+                 n.minobsinnode = 1,
+                 bag.fraction = 1,
+                 interaction.depth = 8,
+                 cv.folds = 5)
+      }
+      pred <- predict(fit, test_cv) %>% data.frame() 
+      pred_res <- cbind(test_cv$BMI.p, pred) %>%
+      setNames(c("True", "Predict"))
+      res <- rbind(res, pred_res)
+  }
+  # cbind Enterotypes 
+  res.cln <- inner_join(phe %>% select(ID, Group),
+                        res %>% rownames_to_column("ID"),
+                        by = "ID")
+  #print(cor.test(res.cln$True, res.cln$Predict, method = "spearman"))
+  return(res.cln)
+}
+
+Feature_all <- function(tag, num, tag2){
+  
+  phe <- phen %>% select(SampleID, ID, Group, Stage, BMI.p) %>%
+    filter(Group%in%tag2) %>%
+    filter(Stage=="Before")
+  tax <- commonTax(spf)
+  prf.sp <- spf[rownames(spf)%in%tax, ] %>%
+      t() %>% data.frame() %>% rownames_to_column("SampleID")
+  
+  prf.am <- amf %>% t() %>% data.frame() %>% 
+    rownames_to_column("SampleID")
+  mdat.am <- inner_join(phe, prf.am, by = "SampleID")
+  
+  mdat1 <- inner_join(mdat.am, prf.sp, by = "SampleID")
+  
+  # select feature    
+  library(glmnet)
+  set.seed(123)
+  lasso <- cv.glmnet(x=model.matrix(~., scale(mdat1[, -c(1:ncol(phe))]) %>% data.frame()),
+                     y=scale(mdat1$BMI.p),
+                     family='gaussian',
+                     nfolds = 10,
+                     alpha = 1,
+                     nlambda = 100)
+  lasso.mk <- data.frame(as.matrix(coef(lasso, lasso$lambda.min))) %>%
+      setNames("Score") %>%
+      rownames_to_column("Type") %>%
+      slice(-c(1:2)) %>%
+      filter(Score!=0)
+  #print(lasso.mk)
+  mdat1.mk <- mdat1 %>% select(SampleID, ID, BMI.p, lasso.mk$Type)
+  
+  data_all <- mdat1.mk %>% select(-SampleID) %>%
+    column_to_rownames("ID")
+  # cross validation of feature
+  library(caret)
+  set.seed(123)
+  folds <- createFolds(y=data_all$BMI.p, k=num)
+  res <- data.frame()
+  for (i in 1:num) {
+      train_cv <- data_all[-folds[[i]], ]
+      test_cv <- data_all[folds[[i]], ]
+      if(tag=="glm"){
+        fit <- glm(BMI.p~., data=train_cv, family = "gaussian")
+      } else if(tag=="rf"){
+        library(randomForest)
+        fit <- randomForest(BMI.p~., data = train_cv, mtry=3, importance=T) 
+      } else if(tag=="gbm"){
+        library(gbm)
+        fit <- gbm(BMI.p~., data = train_cv,
+                 distribution = "gaussian",
+                 n.trees = 1000, 
+                 shrinkage = 0.01,
+                 n.minobsinnode = 1,
+                 bag.fraction = 1,
+                 interaction.depth = 8,
+                 cv.folds = 5)
+      }
+      pred <- predict(fit, test_cv) %>% data.frame() 
+      pred_res <- cbind(test_cv$BMI.p, pred) %>%
+      setNames(c("True", "Predict"))
+      res <- rbind(res, pred_res)
+  }
+  # cbind Enterotypes 
+  res.cln <- inner_join(phe %>% select(ID, Group),
+                        res %>% rownames_to_column("ID"),
+                        by = "ID")
+  return(list(res=res.cln, mk=lasso.mk))
+}
+
+mkplot <- function(x, num){
+  if(num==6){
+  marker <- x %>% mutate(value=(Score*100)) %>%
+    mutate(Signif=c("ns", "ETB", "ETB", "ETP", "ns", "ns")) %>%
+    arrange(desc(abs(value)))
+  }else{
+   marker <- x %>% mutate(value=(Score*100)) %>%
+    mutate(Signif=c("ns", "ETB", "ETB", "ns", "ETP", "ns", "ns")) %>%
+    arrange(desc(abs(value)))   
+  }
+  
+  dat <- marker
+  dat$Type <- factor(dat$Type, levels = as.character(marker$Type))
+  dat$Signif <- factor(dat$Signif, levels = c("ETB", "ETP", "ns"))
+  dat$hjust <- ifelse(dat$value > 0, 1.1, -0.1)
+  
+  pl <- ggplot(dat, aes(x=Type, y=value, fill=Signif,
+                hjust = hjust))+
+    geom_bar(stat = "identity",position="identity", color = "black", width = .9)+
+    geom_text(aes(y=value, label=round(Score, 2)),
+              position = position_dodge(width = 0.9), color="white", size=4)+
+    geom_text(aes(y = 0, color = Signif, label = Type))+
+    geom_hline(yintercept=0)+
+    ylab("Coefficient estimate in Lasso")+
+    xlab("")+
+    scale_fill_manual(values=c(grp.col, "#999999"),
+                      breaks=c("ETB", "ETP", "ns"),
+                      labels=c("Significantly enriched in ETB",
+                               "Slightly enriched in ETP",
+                               "No significant enrichment"))+
+    scale_color_manual(values=c(grp.col, "#999999"))+
+    scale_y_continuous(breaks=seq(-30,30,10),
+                       labels = round(seq(-0.3,0.3,0.1),1),
+                       limits = c(-32, 32))+
+    guides(fill=guide_legend(title = NULL,keywidth=.8,keyheight=.8),
+           color=F)+
+    theme_bw()+
+    coord_flip()+
+    theme(
+          axis.title = element_text(size=10, color="black", face="bold"),
+          axis.text = element_text(size=9, color="black"),
+          axis.text.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          text = element_text(size=8, color="black"),
+          strip.text = element_text(size=9, color="black"), 
+          panel.grid = element_blank(),
+          legend.justification=c(0.05, 0.95),
+          legend.position=c(0.05, 0.95))
+  return(pl)
+}
+
+visplot <- function(x){
+  dat <- x %>% mutate(Group=factor(Group, levels = grp))
+  test <- with(dat, 
+       cor.test(True, Predict, method = "spearman"))
+  # p <- signif(test$p.value, 3)
+  r <- round(test$estimate, 3)
+  lab <- paste0("spearman's"," rho=", r)
+  pl <- ggplot(x, aes(x=True, y=Predict, color=Group))+
+    geom_point(size=2, shape=19)+
+    geom_smooth(method=lm, se=FALSE, color="black")+
+    annotate("text", x=.1, y=max(x$Predict),
+             label = lab, size = 6)+
+    ylab("Predict BMI loss ratio(100%)")+
+    xlab("Actual BMI loss ratio(100%)")+
+    scale_color_manual(values = grp.col)+
+    guides(color=guide_legend(title = NULL,keywidth=.8,keyheight=.8))+    
+    theme_bw()+
+    theme(
+        axis.title = element_text(size=10, color="black", face="bold"),
+        axis.text = element_text(size=9, color="black"),
+        text = element_text(size=8, color="black"),
+        strip.text = element_text(size=9, color="black"), 
+        panel.grid = element_blank(),
+        legend.justification=c(1,0),
+        legend.position=c(1, 0))  
+  return(pl)
+}
+```
+
+#### Figure5 
+```{r}
+sp.res <- Feature_sp("glm", 41, grp)
+sp.mk <- mkplot(sp.res$mk, 6)
+sp.cc <- visplot(sp.res$res)
+
+cowplot::plot_grid(sp.mk, sp.cc,
+  ncol = 2, align = "h", axis = "b",
+  labels = c("A", "B"))
+#ggsave("../pdf/Figure5.pdf", width = 8, height = 4, dpi = 300)
+```
+
+### amino acids
+```{r}
+aa.res <- Feature_aa(grp)
+```
+
+### SFigure 2 : BMI 
+```{r}
+bmi.res <- Feature_bmi("glm", 41, grp)
+visplot(bmi.res)
+ggsave("../pdf/SFigure2.pdf", width = 5, height = 4, dpi = 300)
+```
+
+### cbind species and amino acids
+```{r}
+all.res <- Feature_all("glm", 36, grp)
+all.mk <- mkplot(all.res$mk, 7)
+all.cc <- visplot(all.res$res)
+
+cowplot::plot_grid(all.mk, all.cc,
+  ncol = 2, align = "h", axis = "b",
+  labels = c("A", "B"))
+ggsave("../pdf/Figure5.pdf", width = 9, height = 4, dpi = 300)
+```
+

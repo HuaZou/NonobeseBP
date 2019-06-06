@@ -1,0 +1,125 @@
+---
+title: "BMI"
+output:
+  html_notebook:
+    code_folding: hide
+---
+
+```{r setup, include=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = F)
+library(dplyr)
+library(tibble)
+library(ggplot2)
+library(ggpubr)
+
+# pink/blue/
+grp <- c("ET_B", "ET_P")
+grp.col <- c("#FF6000", "#0080C0")
+
+stg <- c("Before", "After")
+stg.col <- c("#6288BA", "#C25D97")
+```
+
+### load data
+```{r}
+phen <- read.csv("../datset/phenotype/phenotype.grp.csv") %>%
+  mutate(Group=factor(Group, levels = grp),
+         Stage=factor(Stage, levels = stg))
+```
+
+### Figure2B  
+```{r}
+box.bmi.before <- ggplot(phen %>% filter(Stage=="Before"), aes(x=Group, y=BMI, fill=Group))+
+  stat_boxplot(aes(color=Group), geom='errorbar',
+               width=0.15)+
+  geom_boxplot(width=.4)+
+  scale_y_continuous(breaks = seq(18, 29, 2),
+                     limits = c(17, 30),
+                     expand = c(0, 0))+
+  stat_compare_means(comparisons = list(grp),
+                     method = "wilcox.test",
+                     label  = "p.format")+
+  scale_fill_manual(values = grp.col)+
+  scale_color_manual(values = grp.col)+  
+  guides(color=F, fill=F)+
+  xlab("")+
+  ylab(bquote('BMI ('*kg/m^2*')'))+
+  theme_classic()+
+  theme(
+      axis.title = element_text(size=10, color="black", face="bold"),
+      axis.text = element_text(size=9, color="black", face="bold"),
+      text = element_text(size=8, color="black"),
+      strip.text = element_text(size=9, color="black", face="bold"), 
+      panel.grid = element_blank(),
+      legend.justification=c(1,0),
+      legend.position=c(1, 0))
+
+box.bmi.before
+#ggsave("../pdf/Figure2B.pdf", width = 3, height = 2.5, dpi = 600)
+```
+
+### Figure2CD
+```{r}
+box.bmi.g <- ggplot(data = phen, aes(x=Stage, y=BMI, fill=Stage))+
+  stat_boxplot(aes(color=Stage), geom='errorbar',
+               width=0.15)+
+  geom_boxplot(width=.4)+
+  facet_grid(.~Group, scales = "free", space="free")+
+  scale_y_continuous(breaks = seq(18, 29, 2),
+                     limits = c(17, 30),
+                     expand = c(0, 0))+
+  stat_compare_means(comparisons = list(stg),
+                     method = "wilcox.test",
+                     paired = T,
+                     label  = "p.signif")+
+  scale_fill_manual(values = stg.col)+
+  scale_color_manual(values = stg.col)+  
+  guides(color=F, fill=F)+
+  xlab("")+
+  ylab(bquote('BMI ('*kg/m^2*')'))+
+  theme_classic()+
+  theme(
+      axis.title = element_text(size=10, color="black", face="bold"),
+      axis.text = element_text(size=9, color="black", face="bold"),
+      text = element_text(size=8, color="black"),
+      strip.text = element_text(size=9, color="black", face="bold"), 
+      panel.grid = element_blank(),
+      legend.justification=c(1,0),
+      legend.position=c(1, 0))
+  
+# BMI change 
+phe.bmi.p <- phen %>% filter(Stage%in%stg[2]) %>% 
+  select(Stage, Group, BMI.p) %>%
+  mutate(Stage=factor(Stage, levels = stg),
+         Group=factor(Group, levels = grp)) %>%
+  Rmisc::summarySE(measurevar="BMI.p", groupvars=c("Stage", "Group"))
+
+bar.bmi.p <- ggplot(phe.bmi.p, aes(x=Group, y=BMI.p, fill=Group)) + 
+  geom_bar(stat="identity", width = .7, color="black", size=1) +
+  geom_errorbar(aes(ymin=BMI.p, ymax=BMI.p+se),
+                  width=.35, color="black", size=1)+
+  scale_fill_manual(values = grp.col)+
+  scale_y_continuous(breaks = seq(0, 3.5,0.5),
+                     limits = c(0, 4),
+                     expand = c(0, 0))+
+  geom_segment(aes(x = 1, y = 3.8,
+                   xend = 2, yend = 3.8),
+               size=.5)+
+  annotate("text", x=1.5, y=3.98, label="*", size=7)+
+  guides(fill=F)+
+  xlab("")+
+  #scale_x_discrete(position = "top")+ 
+  ylab("BMI loss ratio (100%)")+
+  theme_classic()+
+  theme(
+      axis.title = element_text(size=10, color="black", face="bold"),
+      axis.text = element_text(size=9, color="black", face="bold"),
+      text = element_text(size=8, color="black"),
+      panel.grid = element_blank())
+
+cowplot::plot_grid(box.bmi.g, bar.bmi.p,
+  ncol = 2, align = "h", axis = "b",
+  labels = c("A", "B"))
+
+#ggsave("../pdf/Figure2CD.pdf", width = 6, height = 2.5, dpi = 600)
+```

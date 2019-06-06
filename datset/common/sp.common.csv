@@ -1,0 +1,166 @@
+"type","occurence","median"
+"Acidaminococcus_fermentans",0.9878,3.33868983007724e-06
+"Acidaminococcus_intestini",0.878,1.19373951362174e-06
+"Aggregatibacter_segnis",0.9756,1.8911047298795e-06
+"Akkermansia_muciniphila",1,1.83775813246414e-05
+"Alistipes_putredinis",1,0.0119609729056082
+"Alistipes_shahii",1,0.00204873196383882
+"Anaerostipes_caccae",1,7.44292984306606e-06
+"Anaerotruncus_colihominis",1,0.000221990349604798
+"Bacteroides_caccae",1,0.00307836444890694
+"Bacteroides_clarus",1,0.000350967232579691
+"Bacteroides_coprocola",1,0.0019533654957401
+"Bacteroides_coprophilus",1,0.000897939739376926
+"Bacteroides_coprosuis",0.9512,1.62432758553338e-06
+"Bacteroides_dorei",1,0.0367115047792091
+"Bacteroides_eggerthii",1,0.00121943153632642
+"Bacteroides_finegoldii",1,0.00172815920508069
+"Bacteroides_fluxus",1,0.000245132626838899
+"Bacteroides_fragilis",1,0.00287415869184455
+"Bacteroides_helcogenes",1,2.00258428735742e-05
+"Bacteroides_intestinalis",1,0.00169717442753192
+"Bacteroides_ovatus",1,0.011139634542834
+"Bacteroides_plebeius",1,0.00122714934230714
+"Bacteroides_salanitronis",1,0.000244662332090267
+"Bacteroides_stercoris",1,0.00738961461164454
+"Bacteroides_thetaiotaomicron",1,0.00793291643339616
+"Bacteroides_uniformis",1,0.0255917571962475
+"Bacteroides_xylanisolvens",1,0.00847401846325863
+"Bifidobacterium_adolescentis",1,2.87169862636035e-05
+"Bifidobacterium_animalis",0.9878,1.58448995349002e-06
+"Bifidobacterium_bifidum",0.9756,3.16911297783459e-06
+"Bifidobacterium_breve",0.9878,1.74042468994611e-06
+"Bifidobacterium_dentium",0.939,1.6222653291355e-06
+"Bifidobacterium_longum",1,5.58570196409779e-05
+"Bilophila_wadsworthia",1,0.00173304446454552
+"Blautia_hansenii",1,0.000260568513853232
+"Blautia_hydrogenotrophica",1,9.35762087729053e-05
+"Burkholderia_pseudomallei",0.9756,7.13686605767235e-06
+"Butyrivibrio_crossotus",1,0.000116181795615773
+"Campylobacter_hominis",0.878,1.40195572028232e-06
+"Campylobacter_jejuni",1,1.8436433125953e-05
+"Citrobacter_koseri",0.9878,4.66584971518194e-06
+"Clostridiales_genomosp._BVAB3",0.8415,1.23614662782613e-06
+"Clostridium_bolteae",1,0.000130099186421562
+"Clostridium_leptum",1,8.15177063261462e-05
+"Clostridium_methylpentosum",1,3.12316909945233e-05
+"Clostridium_perfringens",1,2.51505598558341e-06
+"Clostridium_ramosum",1,1.29030061583393e-05
+"Clostridium_saccharolyticum",1,0.000291232449124385
+"Clostridium_scindens",1,2.60539604673222e-05
+"Clostridium_spiroforme",1,2.09037993059729e-06
+"Clostridium_symbiosum",1,0.000155945530921187
+"Collinsella_aerofaciens",1,2.14226641699881e-05
+"Coprococcus_catus",1,0.000163609712936752
+"Coprococcus_comes",1,0.000272803605544654
+"Coprococcus_eutactus",1,8.17508743380564e-05
+"Desulfovibrio_piger",0.9756,1.16567990979046e-06
+"Dialister_invisus",1,4.84283223515646e-06
+"Dorea_formicigenerans",1,0.000235697424289075
+"Dorea_longicatena",1,0.000147022050877432
+"Eggerthella_lenta",1,1.09413918577736e-05
+"Enterobacter_aerogenes",0.9878,1.78651678427741e-06
+"Enterobacter_cloacae",1,7.42581668522102e-06
+"Enterococcus_faecalis",1,2.54114302763514e-05
+"Enterococcus_faecium",1,5.84322455634136e-05
+"Escherichia_coli",1,0.00191316007389136
+"Eubacterium_biforme",1,2.70050966823808e-05
+"Eubacterium_cylindroides",1,1.81191745238505e-05
+"Eubacterium_dolichum",1,2.29889318801221e-05
+"Eubacterium_eligens",1,0.00110925817387215
+"Eubacterium_hallii",1,9.99724851609942e-05
+"Eubacterium_limosum",1,5.25931051285026e-06
+"Eubacterium_rectale",1,0.00325391438396035
+"Eubacterium_saburreum",0.9878,1.87619597639596e-06
+"Eubacterium_siraeum",1,0.000115145294998122
+"Eubacterium_ventriosum",1,0.000376423243003705
+"Faecalibacterium_prausnitzii",1,0.00929319507896039
+"Fusobacterium_mortiferum",0.878,2.66867083491524e-06
+"Gemella_sanguinis",1,1.92830892172843e-06
+"Granulicatella_adiacens",1,1.46711518220433e-06
+"Haemophilus_haemolyticus",0.939,3.95205889872464e-06
+"Haemophilus_influenzae",0.9512,3.4503526558725e-06
+"Haemophilus_parainfluenzae",1,0.000121720971938127
+"Haemophilus_pittmaniae",0.939,1.9590701857702e-06
+"Holdemania_filiformis",1,0.000203322708231618
+"Klebsiella_oxytoca",0.9878,3.39570822151618e-06
+"Klebsiella_pneumoniae",0.9146,1.39469349185001e-06
+"Lachnospiraceae oral_taxon_107",1,1.30081880139345e-05
+"Lactobacillus_ruminis",1,5.08692839528564e-06
+"Marvinbryantia_formatexigens",1,1.88175836349965e-05
+"Megasphaera_micronuciformis",1,1.53039843878952e-06
+"Mitsuokella_multacida",0.9878,1.04075773086135e-06
+"Mobiluncus_curtisii",0.939,1.47796523030802e-06
+"Odoribacter_splanchnicus",1,0.00327594818553109
+"Oribacterium_sinus",1,2.12695494856633e-06
+"Oxalobacter_formigenes",1,1.19948427708905e-05
+"Parabacteroides_distasonis",1,0.013340407042421
+"Parabacteroides_merdae",1,0.00433926161832941
+"Paraprevotella_xylaniphila",1,0.000226236889802833
+"Parasutterella_excrementihominis",1,0.0010976592128669
+"Peptostreptococcus_anaerobius",1,2.32320824850934e-06
+"Phascolarctobacterium_succinatutens",1,2.20020969392847e-05
+"Porphyromonas_asaccharolytica",1,2.50313609158225e-06
+"Prevotella_bergensis",0.939,3.26223504416886e-06
+"Prevotella_bivia",1,0.000111674994704717
+"Prevotella_buccae",1,2.20725297726085e-05
+"Prevotella_buccalis",1,1.17919708396253e-05
+"Prevotella_copri",1,0.00038316538447027
+"Prevotella_disiens",1,6.65624199419225e-05
+"Prevotella_oris",1,2.67239534000104e-05
+"Prevotella_tannerae",1,4.63690317631468e-06
+"Prevotella_timonensis",1,3.89858055604787e-05
+"Pseudoflavonifractor_capillosus",1,5.99217972265971e-05
+"Roseburia_hominis",1,0.000399708484182341
+"Roseburia_intestinalis",1,0.00136572290033305
+"Roseburia_inulinivorans",1,0.00130156927240275
+"Ruminococcus_albus",0.9878,8.77723624230786e-06
+"Ruminococcus_bromii",1,0.000718753913650475
+"Ruminococcus_champanellensis",1,2.61227339883067e-05
+"Ruminococcus_flavefaciens",0.9268,2.51230773630295e-06
+"Ruminococcus_lactaris",1,0.000172938529568281
+"Salmonella_enterica",1,5.34474082334471e-06
+"Streptococcus_anginosus",1,1.41202540450861e-06
+"Streptococcus_australis",1,5.78803686475825e-06
+"Streptococcus_dysgalactiae",1,3.12980303584539e-05
+"Streptococcus_gallolyticus",1,3.3861928973873e-06
+"Streptococcus_infantis",1,4.66591389767551e-06
+"Streptococcus_mitis",1,1.48513713311922e-06
+"Streptococcus_parasanguinis",1,9.93748715586052e-06
+"Streptococcus_pneumoniae",1,3.41209894077619e-06
+"Streptococcus_pyogenes",0.9878,1.8948895120343e-06
+"Streptococcus_salivarius",1,7.46483947378475e-05
+"Streptococcus_sanguinis",1,1.50624142457172e-06
+"Streptococcus_suis",0.9878,2.85185956299369e-06
+"Streptococcus_thermophilus",1,7.17738099093125e-06
+"Streptococcus_vestibularis",1,5.18144159854974e-06
+"Subdoligranulum_variabile",1,5.47423528014631e-05
+"Sutterella_wadsworthensis",1,1.41466847948254e-05
+"Tannerella_forsythia",1,9.13613812929449e-06
+"Treponema_vincentii",1,1.31828404808382e-06
+"Turicibacter_sanguinis",0.9146,1.48009778471297e-06
+"Veillonella_atypica",1,6.72482933326843e-06
+"Veillonella_dispar",1,1.04816456392835e-05
+"Veillonella_parvula",1,2.45267253800744e-05
+"Alistipes sp_HGB5",1,0.00061914068374073
+"Capnocytophaga sp oral_taxon_329",1,0.000138391818728793
+"Citrobacter sp_30_2",1,1.19076645387898e-05
+"Clostridiales bacterium_1_7_47FAA",1,6.21876936615686e-05
+"Clostridium sp_7_2_43FAA",0.9268,1.21541889647671e-06
+"Clostridium sp_D5",1,2.70763751223198e-05
+"Clostridium sp_HGF2",1,1.66967148649092e-05
+"Clostridium sp_SY8519",1,3.20088132683997e-06
+"Coprobacillus sp_29_1",1,4.71866787383511e-05
+"Erysipelotrichaceae bacterium_3_1_53",1,5.59733217490976e-05
+"Erysipelotrichaceae bacterium_5_2_54FAA",1,5.38232727327132e-05
+"Fusobacterium",1,1.9477959163286e-06
+"Lachnospiraceae bacterium_1_4_56FAA",1,4.12855533312596e-05
+"Lachnospiraceae bacterium_2_1_46FAA",1,6.74264116081469e-06
+"Lachnospiraceae bacterium_3_1_57FAA_CT1",1,0.00011482905209013
+"Lachnospiraceae bacterium_4_1_37FAA",1,1.14657404677455e-05
+"Lachnospiraceae bacterium_9_1_43BFAA",1,1.5888683194943e-05
+"Ruminococcaceae bacterium_D16",1,0.000115551729389413
+"Ruminococcus sp_5_1_39BFAA",1,0.000749869783098304
+"Streptococcus sp_C150",0.9878,1.56786915242613e-06
+"Streptococcus sp oral_taxon_071",1,1.91464131298873e-06
+"Veillonella sp oral_taxon_158",1,1.54631938613241e-05

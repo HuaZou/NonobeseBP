@@ -1,0 +1,379 @@
+---
+title: "Figure in before"
+output: 
+  html_notebook:
+    codes: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = F, message = F)
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+library(tibble)
+
+grp <- c("ET_B", "ET_P")
+grp.col <- c("#FF6000", "#0080C0")
+
+stg <- c("Before", "After")
+stg.col <- c("#6288BA", "#C25D97")
+```
+
+### load data
+```{r}
+# phenotype
+phen <- read.csv("../datset/phenotype/phenotype.grp.csv")
+before <- phen %>% filter(Stage=="Before") %>%
+  select(SampleID, Group) %>% 
+  mutate(Group = factor(Group, levels = grp),
+         SampleID = as.character(SampleID))
+
+# relative abundance 
+gsf <- read.table("../datset/profile/Genus.profile") 
+spf <- read.table("../datset/profile/Species.profile")
+amf <- read.table("../datset/profile/Amino.profile")
+```
+
+### wilcox rank-sum test
+```{r}
+commonTax <- function(x, 
+                      occ=0.8,
+                      abun=1e-6){
+  prf <- x %>% rownames_to_column("tmp") %>%
+    filter(tmp!="unclassed") %>% 
+    filter(apply(select(., -one_of("tmp")), 1,
+                 function(x){sum(x[!is.na(x)] > 0) / 
+                     length(x[!is.na(x)])}) > occ) %>%
+    data.frame(.) %>%
+    column_to_rownames("tmp") %>%
+    t() %>% data.frame()
+  prf.cln <- apply(prf, 2, median) %>%
+    data.frame() %>% setNames("Abundance") %>%
+    rownames_to_column("tmp") %>%
+    filter(Abundance > abun & nchar(tmp) < 60)
+  res <- as.character(prf.cln$tmp)
+  return(res)
+}
+
+tfun <- function(y,
+                 x=phen){
+  
+  sid <- intersect(as.character(x$SampleID), colnames(y))
+  phe <- x %>% filter(SampleID%in%sid)
+  tax <- commonTax(y)
+  prf <-  y %>% select(as.character(phe$SampleID)) %>%
+    rownames_to_column("tmp") %>%
+    filter(tmp%in%tax) %>%
+    column_to_rownames("tmp") 
+  
+  wilcoxFun <- function(tag1, tag2, phs=phe, pro=prf){
+    pht <- phs %>% filter(Stage%in%tag1 & Group%in%tag2) %>% 
+      mutate(Group=factor(Group, levels=tag2))
+    datprf <- pro %>% select(as.character(pht$SampleID))
+    pr <- levels(pht$Group)
+    res <- apply(datprf, 1, function(x, grp){
+      dat <- as.numeric(x)
+      p <- wilcox.test(dat ~ grp, paired = F)$p.value	
+      md <- median(dat)
+      mdn <- tapply(dat, grp, median)
+      if ( mdn[1] > mdn[2]) {
+        enrich <- levels(grp)[1]
+      } else {
+        enrich <- levels(grp)[2]
+      }
+      occ <- tapply(dat, grp, function(x){
+        round(sum(x > 0)/length(x), 4)})
+      
+      res <- c(p,enrich,occ,md,mdn)
+      return(res)
+    }, pht$Group) %>% 
+      t(.) %>% data.frame(.) %>%
+      rownames_to_column("Type") %>%
+      varhandle::unfactor(.)
+    
+    colnames(res)[2:8] <- c("Pvalue", "Enrichment",
+                            paste0(pr, "_occurence"), "median", 
+                            paste0(pr, "_median"))  
+    res$Block <- paste0(tag1, " ", pr[1], "_vs_", pr[2])
+    number <- as.numeric(table(pht$Group))
+    res$Num <- paste0(pr[1], number[1], "_vs_",
+                      pr[2], number[2])
+    
+    res.cln <- res %>% select(c(1,9:10, 2:8)) %>%
+      mutate(Pvalue=as.numeric(Pvalue),
+             median=as.numeric(median)) %>%      
+      arrange(median, Pvalue) %>%
+      mutate(FDR=p.adjust(Pvalue, method = "BH"))
+    
+    return(res.cln)
+  }
+  res1 <- wilcoxFun("Before", grp)
+  res2 <- wilcoxFun("After", grp)
+  res <- rbind(res1, res2)
+  return(res)
+} 
+
+
+if(file.exists("../datset/compare/gs.stage.wilcox.csv")){
+  gs.grp.t <- read.csv("../datset/compare/gs.group.wilcox.csv")
+  sp.grp.t <- read.csv("../datset/compare/sp.group.wilcox.csv")
+} else {
+  # source script 
+  source("calculate.R")
+  gs.grp.t <- tfun(gsf)
+  sp.grp.t <- tfun(spf)
+  aa.grp.t <- tfun(amf)
+  
+  write.csv(gs.grp.t, "../datset/compare/gs.group.wilcox.csv", row.names = F)  
+  write.csv(sp.grp.t, "../datset/compare/sp.group.wilcox.csv", row.names = F)
+  write.csv(aa.grp.t, "../datset/compare/aa.group.wilcox.csv", row.names = F)
+}
+```
+
+### common taxonomy
+```{r}
+run <- T
+if(run){
+    comTaxOupt <- function(x,
+                        type, 
+                        occ=0.8,
+                        abun=1e-6){
+    prf <- x %>% rownames_to_column("tmp") %>%
+      filter(tmp!="unclassed") %>% 
+      filter(apply(select(., -one_of("tmp")), 1,
+                   function(x){sum(x[!is.na(x)] > 0) / 
+                       length(x[!is.na(x)])}) > occ) %>%
+      data.frame(.) %>%
+      column_to_rownames("tmp") %>%
+      t() %>% data.frame()
+    prf.cln <- apply(prf, 2, median) %>%
+      data.frame() %>% setNames("Abundance") %>%
+      rownames_to_column("tmp") %>%
+      filter(Abundance > abun & nchar(tmp) < 60)
+    prf.out <- x %>% rownames_to_column("tmp") %>% 
+      filter(tmp%in%as.character(prf.cln$tmp)) %>%
+      column_to_rownames("tmp") %>%
+      t() %>% data.frame()
+    dat <- apply(prf.out, 2, function(x){
+      num <- as.numeric(x)
+      occ <- round(sum(x>0)/length(x), 4)
+      med <- median(x)
+      res <- c(occ, med)
+      return(res)
+    }) %>% t() %>% data.frame() %>% 
+      setNames(c("occurence", "median"))
+    
+    if(type=="sp"){
+      res <- dat %>% rownames_to_column("type")
+      res$type <- sub("unclassified_", "", res$type)
+      res$type <- sub("_bacterium", " bacterium", res$type, fixed = T)
+      res$type <- sub("_sp.", " sp", res$type, fixed = T)
+      res$type <- sub("_oral", " oral", res$type, fixed = T)
+    } else{
+      res <- dat %>% rownames_to_column("type")
+    }
+    return(res)
+    }
+  gs.com <- comTaxOupt(gsf, "gs")    
+  sp.com <- comTaxOupt(spf, "sp")
+  write.csv(gs.com, "../datset/common/gs.common.csv", row.names = F)  
+  write.csv(sp.com, "../datset/common/sp.common.csv", row.names = F)  
+}
+```
+
+### Figure 2A
+```{r}
+library(vegan)
+before.gs <- inner_join(gsf %>% select(before$SampleID) %>%
+        rownames_to_column("tmp") %>%
+        filter(apply(select(., -one_of("tmp")), 1,
+        function(x){sum(x[!is.na(x)]>0)/
+            length(x[!is.na(x)])}) > 0) %>%
+        column_to_rownames("tmp") %>%
+        t() %>% data.frame() %>%
+        rownames_to_column("SampleID"),
+        before, by = "SampleID") %>%
+        column_to_rownames("SampleID")
+
+
+before.gs.nmds <- metaMDS(before.gs[, -ncol(before.gs)])
+before.gs.grp <- before.gs[, ncol(before.gs), F]
+before.gs.grp$col <- with(before.gs.grp, ifelse(Group=="ET_B",
+                        grp.col[1], grp.col[2]))
+
+pdf("../pdf/Figure2A.pdf", width = 6, height = 5)
+plot(before.gs.nmds$points, col = before.gs.grp$col, pch = 19)
+ordiellipse(before.gs.nmds, before.gs.grp$Group, display = "sites",
+            kind = "ehull", label = T ,conf = 0.95)
+dev.off()
+```
+
+### function
+```{r}
+TaxExtract <- function(cmp, y, alpha=0.05, x=before){
+  
+  # phenotype 
+  phe <- x %>% select(SampleID, Group)
+  tax <- cmp %>% filter(Block=="Before ET_B_vs_ET_P") %>% 
+      arrange(Enrichment, median) %>%
+      #filter(Pvalue < 0.05) %>%
+      filter(FDR < alpha) %>%
+      mutate(col = ifelse(Enrichment == "ET_B",
+                        grp.col[1], grp.col[2])) %>% 
+      mutate(Enrichment = factor(Enrichment, levels = rev(grp)))
+  # profile 
+  prf <- y %>% select(as.character(phe$SampleID)) %>% 
+    rownames_to_column("tmp") %>% 
+    filter(tmp%in%tax$Type) %>% 
+    column_to_rownames("tmp") %>% 
+    t() %>% data.frame() 
+  
+  # log10 
+  prf[prf == 0] <- min(prf[prf!=min(prf)/2])
+  logprf <- log10(prf)
+  # taxonomic levels 
+  tax$Type <- sub("unclassified_", "", tax$Type)
+  tax$Type <- sub("[", "", tax$Type, fixed = T)
+  tax$Type <- sub("]", "", tax$Type, fixed = T)
+  tax$Type <- sub(".", "", tax$Type, fixed = T)
+  tax$Type <- sub("_", " ", tax$Type, fixed = T)
+  tax$Type <- sub("/", ".", tax$Type, fixed = T)
+  
+  # merge dat 
+  mdat <- inner_join(phe, 
+              logprf %>% rownames_to_column("SampleID"), 
+              by="SampleID") %>% 
+          select(-SampleID)
+  # gather data 
+  tmp <- mdat %>% tidyr::gather(type, value, -c(Group)) 
+  
+  tmp$type <- sub("unclassified_", "", tmp$type)
+  tmp$type <- sub("[", "", tmp$type, fixed = T)
+  tmp$type <- sub("]", "", tmp$type, fixed = T)
+  tmp$type <- sub(".", "", tmp$type, fixed = T)
+  tmp$type <- sub("_", " ", tmp$type, fixed = T)
+  tmp$type <- factor(tmp$type, levels = tax$Type)
+  res <- tmp %>% na.omit()
+  
+  # filter again
+  name2 <- intersect(res$type, tax$Type)
+  tax.cln <- tax %>% filter(Type%in%name2) %>% 
+    arrange(Enrichment, median)
+  res$type <- factor(res$type, 
+        levels = as.character(tax.cln$Type))
+  res$Group <- factor(res$Group, levels = rev(grp))
+  
+  # x-axis scale 
+  groups <- length(levels(res$type))
+  numbox <- 2
+  total <- groups * numbox
+  xpoints <- seq(median(1:numbox), total, numbox)
+
+  # boxplot position
+  pos1 <- seq(1.25, (1.25+(groups-1) * 2), 2)
+  pos <- c()
+  for (i in seq(length(pos1))) {
+    pos <- c(pos, pos1[i], (pos1[i] + 0.5))
+  }
+  
+  # x axis color 
+  col <- tax.cln$col
+  
+  reslist <- list(dat = res, xscale = xpoints,
+                  pos = pos, xcol = col)
+  return(reslist)
+}
+```
+
+### supplemental figure1A 
+```{r}
+pdf("../pdf/SFig1.pdf", width = 6 , height = 10)
+sp.data <- TaxExtract(sp.grp.t, spf)
+par(mgp = c(2, 0.5, 0), font.lab = 2, cex.lab = 0.6, cex.axis = 0.6)
+boxplot(value ~ Group*type, data = sp.data$dat,            
+        xlab = "Relative abundance (log10)",      
+        boxwex = 0.45,                          
+        col = rev(grp.col),                         
+        frame.plot = TRUE,                       
+        axes = FALSE,
+        xaxt = n, 
+        lwd = 1,
+        cex = 0.4,
+        outcex = .4,        
+        pch = 21,                                
+        cex.axis = 0.8,
+        at = sp.data$pos,
+        horizontal = T)
+# y scale 
+yts <- pretty(sp.data$dat$value, n = 5)
+axis(1, yts)
+# x labels
+axis(2, at = sp.data$xscale, labels = F)
+text(y = sp.data$xscale, par("usr")[3] - 5.4, font = 2, 
+     labels = levels(sp.data$dat$type), 
+     col = sp.data$xcol, pos = 2,
+     adj = 4, cex = 0.6, xpd = TRUE)
+legend("bottomright",inset = c(0.01, 0.01),
+       grp, fill = grp.col, box.lty = 0, cex = 0.8)
+dev.off()
+```
+
+### supplemental figure1B 
+```{r}
+library(xlsx)
+path <- read.xlsx("../datset/reporterscore/reporterscore.xlsx", sheetIndex = 1) 
+ScoreFun <- function(x, cfg){
+  if(cfg == "pathway") {
+     level <- c("Amino_Acid_Metabolism","Carbohydrate_Metabolism",
+             "Energy_Metabolism","Membrane_Transport",
+             "Xenobiotics_Biodegradation_and_Metabolism",
+             "Metabolism_of_Cofactors_and_Vitamins") 
+  } else {
+    level <- c("Amino_Acid_Metabolism","Carbohydrate_Metabolism",
+               "PTS","Xenobiotics_Biodegradation_and_Metabolism",
+               "Membrane_Transport",
+               "Metabolism_of_Cofactors_and_Vitamins", "Energy_Metabolism")   
+  }
+  idx <- c("Pathway", "Level2", "Description")
+  tmp <- x %>% select(c(1:4)) %>%
+    setNames(c(idx, "Reportscore"))
+  dat <- tmp %>% filter(Level2 %in% level) %>% 
+               filter(Reportscore < -1.96 | Reportscore > 1.96)
+  dat.z <- dat %>% select(c(idx, grep("score", colnames(dat), value = T))) %>%
+           setNames(c(idx, "ET_B vs ET_P")) %>%
+           tidyr::gather(Group, Reporter, -idx) %>%
+           mutate(newdir=ifelse(Reporter < 0, grp[2], grp[1])) %>%
+           mutate(Group=factor(Group, 
+             levels = c("ET_B vs ET_P"))) 
+  
+  ord_aa <- dat.z %>% filter(Group %in% "ET_B vs ET_P") %>%
+            arrange(Reporter, Level2) 
+  
+  dat.z$Description <- factor(dat.z$Description, levels = ord_aa$Description)
+  dat.z$Level2 <- factor(dat.z$Level2, levels = level)
+  dat.z$newdir <- factor(dat.z$newdir, levels=grp)  
+  return(
+    ggplot(dat.z, aes(y=Description, x=Reporter, color=newdir))+ 
+    geom_segment(xend=0, aes(yend=Description), size=4)+
+    geom_vline(xintercept = 0)+
+    geom_vline(xintercept = c(-1.96,1.96), linetype="dashed", color="grey50")+
+    facet_grid(Level2 ~ Group, scales = "free", space = "free_y")+
+    theme_bw()+
+    scale_color_manual(values = rev(grp.col),
+                       labels = grp)+
+    labs(x="Reporter score", y="")+
+    scale_x_continuous(breaks=seq(-6, 6, 2),
+                       limits=c(-6.1, 6.1))+
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor.x = element_blank(),
+          legend.position = "NA",
+          strip.text.y = element_blank(),
+          axis.title = element_text(size=9, color="black", face="bold"),
+          strip.text = element_text(size=10, color="black", face="bold"),
+          axis.text = element_text(size=8, color="black"))
+  )
+}
+
+ScoreFun(path, "pathway")
+#ggsave("../pdf/SFig1B.pdf", width = 6, height = 6, dpi = 600)
+```

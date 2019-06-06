@@ -1,0 +1,368 @@
+---
+title: "Overall change"
+output:
+  html_notebook:
+    code_folding: hide
+---
+
+```{r setup, include=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = F)
+library(dplyr)
+library(tibble) 
+library(vegan) 
+library(varhandle)
+library(ggplot2)
+library(ggpubr)
+
+# pink/blue/
+grp <- c("ET_B", "ET_P")
+grp.col <- c("#FF6000", "#0080C0")
+
+stg <- c("Before", "After")
+stg.col <- c("#6288BA", "#C25D97")
+
+Theme <- theme(axis.title = element_text(size=10, color="black", face="bold"),
+          axis.text = element_text(size=9, color="black"),
+          text = element_text(size=8, color="black"),
+          strip.text = element_text(size=9, color="black", face="bold"), 
+          panel.grid = element_blank(),
+          legend.text=element_text(size=10, color = "black"),
+          legend.position = c(1, 0),
+          legend.justification = c(1, 0),
+          legend.background = element_rect(color = "black", fill="white"))
+```
+
+### load data
+```{r}
+phen <- read.csv("../datset/phenotype/phenotype.grp.csv") %>%
+  mutate(Group=factor(Group, levels = grp),
+         Stage=factor(Stage, levels = stg))
+spf <- read.table("../datset/profile/Species.profile")
+
+ge.idx <- read.table("../datset/gene.shannon.txt", header = T)
+sp.idx <- read.table("../datset/species.shannon.txt", header = T)
+
+ge.dis <- read.table("../datset/distance/Gene.bray_distance")
+sp.dis <- read.table("../datset/distance/Species.bray_distance")
+
+
+commonTax <- function(x, 
+                      occ=0.8,
+                      abun=1e-6){
+  prf <- x %>% rownames_to_column("tmp") %>%
+    filter(tmp!="unclassed") %>% 
+    filter(apply(select(., -one_of("tmp")), 1,
+                 function(x){sum(x[!is.na(x)] > 0) / 
+                     length(x[!is.na(x)])}) > occ) %>%
+    data.frame(.) %>%
+    column_to_rownames("tmp") %>%
+    t() %>% data.frame()
+  prf.cln <- apply(prf, 2, median) %>%
+    data.frame() %>% setNames("Abundance") %>%
+    rownames_to_column("tmp") %>%
+    filter(Abundance > abun & nchar(tmp) < 60)
+  res <- as.character(prf.cln$tmp)
+  return(res)
+}
+```
+
+### permanova Function
+```{r}
+perFun <- function(x, y) {
+
+  sid <- intersect(as.character(x$SampleID), colnames(y)) 
+  phe <- x %>% filter(SampleID %in% sid) 
+  prf <-  y %>% select(as.character(phe$SampleID)) %>%
+          t() %>% data.frame()
+  per <- apply(phe %>% select(-one_of("SampleID")), 2, function(a, pf){
+    dat <- data.frame(value = a, pf)
+      datphe <- dat$value %>% varhandle::unfactor() 
+      if (length(datphe) == 0 | unique(datphe) == 1) {
+        res <- data.frame(length(datphe), rep(NA, 6))
+        next
+      }
+      if (length(unique(datphe)) < 6) {
+        datphe <- as.factor(datphe)
+      } 
+      datprf <- dat[, -1, F] 
+      dis <- vegdist(datprf, method = "bray")
+      set.seed(123)
+      ad <- adonis(dis ~ datphe, permutations = 1000)
+      tmp <- as.data.frame(ad$aov.tab) %>% slice(1)
+      res <- c(length(datphe), as.numeric(tmp[, c(1:6)]))
+      return(res)
+    }, prf) %>% t() %>% data.frame()
+    
+  colnames(per) <- c("SumsOfSample", "Df", "SumsOfSqs", 
+                       "MeanSqs", "F.Model", "R2", "Pr(>F)")
+  per$FDR <- p.adjust(per$`Pr(>F)`, method = "BH")
+  return(per)
+}
+
+perFun(phen, spf)
+```
+
+### Figure3A
+```{r}
+PCoABPL <- function(x, y){
+  idx <- c("Stage", "ID", "Group")
+  phe <- x %>% select(SampleID, idx) %>% 
+          arrange(SampleID, Stage) %>%
+          mutate(Stage=factor(Stage, levels = stg),
+                 Group=factor(Group, levels = grp))	
+  # distance
+  dis <- as.dist(y[as.character(phe$SampleID), 
+                as.character(phe$SampleID)])
+  # xlab
+  x_break = round(seq(-0.4, 0.5, 0.1), 2)
+  x_limit = c(-0.41, 0.48)
+  # ylab 
+  y_break = round(seq(-0.2, 0.3, 0.1),2)
+  y_limit = c(-0.25, 0.35)  
+  
+  library(ape)
+  pcoa <- pcoa(dis)
+  eig <- pcoa$values[, "Eigenvalues"]
+  eig_var <- eig[1:2]
+  eig_var_explain <- round(eig_var/sum(eig), 4) * 100 
+  explains <- paste0(paste0("PCoA", seq(2)), " (", paste0(eig_var_explain, "%"), ")")
+  # principal coordinate decomposition score of each sample
+  score <- data.frame(pcoa$vectors[, c(1:2)], group = phe[, idx])
+  colnames(score) <- c(paste0("PCoA", seq(2)), idx)
+	
+  # arrow  dataframe
+  ArrowFun <- function(data, cfg1, cfg2){
+    idx <- c("ID", "PCoA1", "PCoA2")
+    dat1 <- subset(data, (Stage==cfg1), select = idx)
+    dat2 <- subset(data, (Stage==cfg2), select = idx)
+    colnames(dat2)[2:3] <- c("xend", "yend")
+    res <- merge(dat1, dat2, by="ID")
+  }
+  
+  bas.low <- ArrowFun(score, "Before", "After")
+  setK <- length(unique(as.character(score$ID)))
+  score$ID <- factor(score$ID)
+  pcx <- summary(aov(PCoA1~ID, data=score))
+  pcx1 <- pcx[[1]]
+  sepx <- formatC(pcx1$`Pr(>F)`[1], format = "e", digits = 2)
+  pcy <- summary(aov(PCoA2~ID, data=score))
+  pcy1 <- pcy[[1]]
+  sepy <- formatC(pcy1$`Pr(>F)`[1], format = "e", digits = 2)
+  
+  score.v2 <- score %>% filter(Stage=="Before")
+  # Group for baseline 
+  p1 <- ggplot(score, aes(x=PCoA1, y=PCoA2))+
+        geom_point(aes(color=Stage, shape=Group), 
+                   alpha=1, 
+                   size=2)+
+        stat_ellipse(data=score.v2, aes(x=PCoA1, y=PCoA2, group = Group), linetype = 2)+
+        stat_ellipse(data=score.v2, aes(x=PCoA1, y=PCoA2, fill = Group), geom = "polygon", alpha=0.2)+
+        labs(x=explains[1],
+             y=explains[2])+
+        scale_shape_manual(values = c(17, 19),
+                       labels = grp)+
+        scale_color_manual(values = stg.col,
+                       labels = stg)+
+        scale_fill_manual(values = grp.col,
+                       labels = grp)+
+        guides(color=guide_legend(title = NULL,keywidth=.7,keyheight=.7),
+               fill=guide_legend(title = NULL,keywidth=.7,keyheight=.7),
+               shape=guide_legend(title = NULL,keywidth=.7,keyheight=.7))+
+        scale_x_continuous(breaks = x_break, 
+                           limits = x_limit)+
+        scale_y_continuous(breaks = y_break, 
+                           limits = y_limit)+        
+        theme_bw()+
+        geom_segment(data=bas.low,
+                     aes(x=PCoA1, y=PCoA2, xend=xend, yend=yend),
+                     arrow=arrow(length=unit(0.12,"cm"), ends="last", type = "closed"),
+                     size=.5,
+                     color= "black",
+                     alpha=.6)+Theme
+  return(list(circle=p1, score=score))
+}
+
+ScorePCoA <- function(y, num){
+  if(num==1){
+    y_breaks <- seq(-0.5, 0.5, 0.2)
+    y_limits <- c(-0.51, 0.53)
+    mdat <- y %>% mutate(Stage=factor(Stage, levels = stg),
+                         Group=factor(Group, levels = grp)) %>%
+      select(ID, Stage, Group, PCoA1) %>%
+      dplyr::rename(value=PCoA1)
+    ylb <- "PCoA1" 
+  }else if(num==2){
+    y_breaks <- round(seq(-0.3, 0.3, 0.1),1)
+    y_limits <- c(-0.3, 0.4)
+    mdat <- y %>% mutate(Stage=factor(Stage, levels = stg),
+                         Group=factor(Group, levels = grp)) %>%
+      select(ID, Stage, Group, PCoA2)%>%
+      dplyr::rename(value=PCoA2)
+    ylb <- "PCoA2" 
+  }
+  
+  p <- ggplot(mdat, aes(x = Stage, y = value))+
+    stat_boxplot(aes(color = Stage), 
+                 geom = "errorbar", 
+                 width = 0.15,
+                 size = .3)+
+    geom_boxplot(aes(fill = Stage), 
+                 width = .4, 
+                 outlier.shape = 1,
+                 size = .3)+
+    stat_compare_means(comparisons = list(stg), 
+                       method = "wilcox.test",
+                       paired = T,
+                       label = "p.signif")+
+    scale_fill_manual(values = stg.col, 
+                      labels = stg)+
+    scale_color_manual(values = stg.col, 
+                       labels = stg)+
+    scale_y_continuous(breaks = y_breaks,
+                       limits = y_limits)+
+    guides(fill = F, color = F)+
+    facet_wrap(facets = "Group")+
+    labs(x = "", y = ylb)+
+    theme_classic()+ Theme
+  return(p)
+}
+
+PCoA <- PCoABPL(phen, sp.dis)
+PCoA$circle
+ggsave("../pdf/Fig3A.pdf", width = 6, height = 5, dpi = 300)
+
+pcoa1 <- ScorePCoA(PCoA$score, 1)
+pcoa2 <- ScorePCoA(PCoA$score, 2)
+
+cowplot::plot_grid(pcoa1, pcoa2,
+  ncol = 2, align = "h", axis = "b")
+ggsave("../pdf/Fig3A12.pdf", width = 4, height = 2, dpi = 300)
+```
+
+### Figure BC
+```{r}
+BetaFun <- function(y, num){
+  phe <- phen %>% mutate(SampleID = as.character(SampleID)) %>%
+         mutate(Stage=factor(Stage, levels = stg)) %>%
+         select(SampleID, Stage, Group)
+  stgFun <- function(cfg1){
+    dat <- phe[grep(cfg1, phe$Stage), ]
+    dis <- y[dat$SampleID, dat$SampleID]
+    flattenMatrix <- function(matirx) {
+      ut <- upper.tri(matirx)
+      data.frame(
+          SampleID = rownames(matirx)[row(matirx)[ut]],
+          SampleID2 = rownames(matirx)[col(matirx)[ut]],
+          value  =(matirx)[ut])
+    }
+    res <- flattenMatrix(dis)
+    res$Stage <- cfg1
+    return(res)
+  }
+  dat1 <- stgFun("Before")
+  dat2 <- stgFun("After")
+  res <- rbind(dat1, dat2)
+  mdat <- left_join(res, phe %>% select(-Stage), by = "SampleID") %>%
+    mutate(Stage=factor(Stage, levels = stg))
+
+  # scale 
+  if(num==1){
+    y_breaks <- seq(0.2, 1, 0.2)
+    y_limits <- c(0.2, 1.1)
+  }else if(num==2){
+    y_breaks <- seq(0, 0.8, 0.2)
+    y_limits <- c(0, 0.85)    
+  }else if(num==3){
+    y_breaks <- seq(0, 0.8, 0.2)
+    y_limits <- c(0, 0.85)    
+  }
+
+  p <- ggplot(mdat, aes(x = Stage, y = value))+
+    stat_boxplot(aes(color = Stage), 
+                 geom = "errorbar", 
+                 width = 0.15,
+                 size = .3)+
+    geom_boxplot(aes(fill=Stage), 
+                 width = .4, 
+                 outlier.shape = 1,
+                 size = .3)+
+      stat_compare_means(comparisons = list(stg), 
+                         method = "wilcox.test", 
+                         paired = T,
+                         label = "p.signif")+
+      scale_fill_manual(values = stg.col, 
+                        labels = stg)+
+      scale_color_manual(values = stg.col,  
+                         labels = stg)+
+      scale_y_continuous(breaks = y_breaks,
+                         limits = y_limits)+
+      guides(fill=F, color=F)+
+      facet_wrap(facets = "Group")+    
+      labs(x="", y="bray distance")+
+      theme_classic()+Theme
+  return(p)
+}
+
+beta.ge <- BetaFun(ge.dis, 1)
+beta.sp <- BetaFun(sp.dis, 2)
+#beta.ko <- BetaFun(ko.dis, 3)
+cowplot::plot_grid(beta.ge, beta.sp,
+  ncol = 2, align = "h", axis = "b",
+  labels = c("B", "C"))
+#ggsave("../pdf/F3BC.pdf", width = 4, height = 2.5, dpi = 300)
+```
+
+### Figure DE
+```{r}
+AlphaFun <- function(y, num){
+  
+  mdat <- inner_join(phen, y, by = "SampleID") %>%
+    mutate(Stage=factor(Stage, levels = stg))
+  
+  # scale 
+  if(num==1){
+    y_breaks <- seq(10, 13, 0.5)
+    y_limits <- c(10, 13.5)
+  }else if(num==2){
+    y_breaks <- seq(0.8, 2.4, 0.2)
+    y_limits <- c(0.75, 2.5)    
+  }else if(num==3){
+    y_breaks <- seq(6, 8, 0.2)
+    y_limits <- c(6.5, 8)    
+  }  
+  
+  p <- ggplot(mdat, aes(x = Stage, y = Index))+
+    stat_boxplot(aes(color = Stage), 
+                 geom = "errorbar", 
+                 width = 0.15,
+                 size = .3)+
+    geom_boxplot(aes(fill = Stage), 
+                 width = .4, 
+                 outlier.shape = 1,
+                 size = .3)+
+    stat_compare_means(comparisons = list(stg), 
+                       method = "wilcox.test",
+                       paired = T,
+                       label = "p.signif")+
+    scale_fill_manual(values = stg.col, 
+                      labels = stg)+
+    scale_color_manual(values = stg.col, 
+                       labels = stg)+
+    scale_y_continuous(breaks = y_breaks,
+                       limits = y_limits)+
+    guides(fill = F, color = F)+
+    facet_wrap(facets = "Group")+
+    labs(x = "", y = "Shannon Index")+
+    theme_classic()+ Theme
+  return(p)
+}
+
+index.ge <- AlphaFun(ge.idx, 1)
+index.sp <- AlphaFun(sp.idx, 2)
+#index.ko <- AlphaFun(ko.idx, 3)
+
+cowplot::plot_grid(index.ge, index.sp,
+  ncol = 2, align = "h", axis = "b",
+  labels = c("D", "E"))
+#ggsave("../pdf/F3DE.pdf", width = 4, height = 2.5, dpi = 300)
+```

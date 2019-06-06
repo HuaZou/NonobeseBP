@@ -1,0 +1,9 @@
+.DS_Store
+*.tmp/
+*.html
+*.Rhistory
+*.log
+*tmp*
+*pdf
+*pdf/
+*Fig*/
