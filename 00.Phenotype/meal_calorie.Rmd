@@ -1,0 +1,179 @@
+---
+title: "meal_calorie"
+output: 
+  html_notebook:
+    codes: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = F, message = F)
+library(dplyr)
+library(tibble)
+```
+
+### load data
+```{r}
+food <- read.csv("../datset/phenotype/food_composition.20191209.csv")
+meal <- read.csv("../datset/phenotype/meal_composition.20191209.csv")
+rate <- read.csv("../datset/phenotype/meal_rate.20191209.csv")
+```
+
+### function
+```{r}
+get_calorie <- function(tag1, tag2="male"){
+  
+  # tag1 <- "D1"
+  # tag2 <- "male"
+  
+  phe <- meal %>% mutate(Cal=NA, CHO=NA, Fat=NA, Pro=NA) %>%
+  filter(Type==tag1) 
+  
+  # calculate calorie 
+  for(i in 1:nrow(phe)){
+    food_com <- food %>% filter(PID==as.character(phe$PID)[i])
+    phe$Cal[i] <- (phe$amount[i]/100) * food_com$Cal
+    phe$CHO[i] <- ((phe$amount[i]/100) * food_com$CHO) * 4
+    phe$Fat[i] <- ((phe$amount[i]/100) * food_com$Fat) * 9
+    phe$Pro[i] <- ((phe$amount[i]/100) * food_com$Pro) * 4
+  }
+  
+  # each meal
+  sum_cal <- phe %>% select(-c("Type", "PID")) %>%
+    group_by(meal) %>%
+    summarise_all(sum) %>%
+    ungroup()
+  
+  # meal rate in sex
+  tmp <- rate %>% filter(Type==tag1)
+  if(tag2 == "male"){
+    ratio <- tmp %>% select(c("meal", "M_count")) %>%
+      setNames(c("meal", "count"))
+  }else{
+    ratio <- tmp %>% select(c("meal", "F_count")) %>%
+      setNames(c("meal", "count"))    
+  }
+  
+  type2 <- sum_cal %>% filter(meal != "D11")
+  tpye2_tmp <- data.frame()
+  for(j in 1:nrow(type2)){
+    id <- type2[j, ]
+    ratio_id <- ratio %>% filter(meal==as.character(id$meal))
+    
+    id_new <- id
+    ratio_num <- (ratio_id$count/id_new$amount)
+    
+    id_new$Cal <- ratio_num * id_new$Cal
+    id_new$CHO <- ratio_num * id_new$CHO
+    id_new$Fat <- ratio_num * id_new$Fat
+    id_new$Pro <- ratio_num * id_new$Pro    
+    id_new$amount <- ratio_id$count
+    tpye2_tmp <- rbind(tpye2_tmp, id_new)
+  }
+  
+  # breakfast
+  type1_sum <- sum_cal %>% filter(meal == "D11")
+   
+  # lunch 
+  tpye2_sum <- colSums(tpye2_tmp[, -1]) %>%
+    data.frame() %>% t() %>% data.frame() %>%
+    mutate(meal="D12")
+  
+  # supper
+  tpye3_sum <- colSums(tpye2_tmp[, -1]) %>%
+    data.frame() %>% t() %>% data.frame() %>%
+    mutate(meal="D13")
+  
+  total_cal <- data.frame(meal="D1_total", 
+                         amount=type1_sum$amount + tpye2_sum$amount*2,
+                         Cal=type1_sum$Cal + tpye2_sum$Cal*2,
+                         CHO=type1_sum$CHO + tpye2_sum$CHO*2,
+                         Fat=type1_sum$Fat + tpye2_sum$Fat*2,
+                         Pro=type1_sum$Pro + tpye2_sum$Pro*2)
+  
+  mean_cal <- data.frame(meal="D1_ratio", 
+                         amount=NA,
+                         Cal=NA,
+                         CHO=total_cal$CHO/total_cal$Cal,
+                         Fat=total_cal$Fat/total_cal$Cal,
+                         Pro=total_cal$Pro/total_cal$Cal)
+  
+  res <- rbind(type1_sum, tpye2_sum, tpye3_sum, total_cal, mean_cal) %>%
+    mutate(Type=tag1)
+  
+  return(list(meal_each=phe, meal_all=res))
+}
+
+get_meal <- function(tag){
+  type1 <- get_calorie("D1", tag)
+  type2 <- get_calorie("D2", tag)
+  type3 <- get_calorie("D3", tag)
+  type4 <- get_calorie("D4", tag)
+  type5 <- get_calorie("D5", tag) 
+  
+  meal_each <- rbind(type1$meal_each, type2$meal_each, type3$meal_each, type4$meal_each, type5$meal_each)
+  meal_all <- rbind(type1$meal_all, type2$meal_all, type3$meal_all, type4$meal_all, type5$meal_all)
+  
+  return(list(each=meal_each, all=meal_all))
+}
+
+sum_standard_meal <- function(x){
+  # x <- meal_cal_male$each
+  id_grp1 <- as.character(unique(x$Type))
+  id_grp2 <- as.character(unique(x$meal))
+  res <- data.frame()
+  for(i in 1:length(id_grp1)){
+    id1 <- id_grp1[i]
+    tmp <- x %>% filter(Type%in%id1) 
+    tmp_sum <- tmp %>%
+      select(-c("Type", "PID")) %>%
+      group_by(meal) %>%
+      summarise_all(sum) %>%
+      ungroup()
+    for(j in 1:length(id_grp2)){
+      id2 <- id_grp2[j]
+      tmp2 <- tmp %>% filter(meal==id2)
+      tmp2_sum <- tmp_sum %>% filter(meal==id2) %>%
+        mutate(Type=id1, PID=NA)
+      res <- rbind(res, tmp2, tmp2_sum)
+    }
+  }
+  
+  return(res)
+}
+```
+
+### male 
+```{r}
+meal_cal_male <- get_meal("male")
+write.csv(meal_cal_male$all, "../datset/diet/meal_cal_male.csv", row.names = F)
+```
+
+### female 
+```{r}
+meal_cal_female <- get_meal("female")
+write.csv(meal_cal_female$all, "../datset/diet/meal_cal_female.csv", row.names = F)
+```
+
+### standard meal 
+```{r}
+standard_meal <- sum_standard_meal(meal_cal_male$each)
+write.csv(standard_meal, "../datset/diet/Standard_meal.csv", row.names = F)
+```
+
+
+### dietary composition
+
+```{r}
+library(plotrix)
+dat <- data.frame(group = c("Carbohydrate", "Protein", "Fat"),
+                  pct=c(43, 25, 32)) %>%
+  mutate(label = paste(group, "\n", paste0(pct, "%")))
+
+pie3D(dat$pct,
+      labels=dat$label,  
+      col=c("darkolivegreen1", "white", "indianred"),
+      shade=0.5, explode=0.1,
+      theta = 0.8, radius = 1, 
+      labelcex = 1)
+```
+
