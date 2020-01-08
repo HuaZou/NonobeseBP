@@ -429,6 +429,8 @@ library(vegan)
 
 perFun_delta_aa <- function(y) {
   
+  # y <- spf
+  
   sid <- intersect(phen$SampleID, intersect(colnames(amf), colnames(y))) 
   phe <- phen %>% filter(SampleID%in%sid) %>% 
     select(ID, Stage, SampleID) %>% 
@@ -470,7 +472,7 @@ perFun_delta_aa <- function(y) {
       
     # distance 
     datprf <- dat[, -1, F] 
-    dis <- vegdist(datprf, method = "bray")
+    dis <- vegdist(datprf, method = "manhattan")
       
     set.seed(123)
     ad <- adonis(dis ~ datphe, permutations = 1000)
@@ -489,11 +491,74 @@ perFun_delta_aa <- function(y) {
   return(per)
 }
 
-# Genus and amino acids
-#perFun_delta_aa(gsf)
-
 # Species and amino acids
 spf.amf.delta.per <- perFun_delta_aa(spf)
-#write.csv(spf.amf.delta.per, "../datset/correlation/spf.amf.delta.csv")
+write.csv(spf.amf.delta.per, "../datset/correlation/spf.amf.delta.csv")
 ```
 
+* baseline taxonomy & change in amino acids
+```{r}
+perFun_aa <- function(y) {
+  
+  sid <- intersect(phen$SampleID, intersect(colnames(amf), colnames(y))) 
+  phe <- phen %>% filter(SampleID%in%sid) %>% 
+    select(ID, Stage, SampleID) %>% 
+    arrange(ID, Stage)
+  
+  phe_amf <- inner_join(phe, amf %>% t() %>% data.frame() %>% rownames_to_column("SampleID"),
+                        by = "SampleID")
+  amf_delta <- (phe_amf %>% filter(Stage==stg[1]) %>% select(-c("ID", "Stage", "SampleID")) -
+               phe_amf %>% filter(Stage==stg[2]) %>% select(-c("ID", "Stage", "SampleID")) ) %>%
+    mutate(ID = unique(as.character(phe_amf$ID))) %>%
+    column_to_rownames("ID")
+  
+  phe_prf <- inner_join(phe, y %>% t() %>% data.frame() %>% rownames_to_column("SampleID"),
+                        by = "SampleID") %>% 
+    filter(Stage==stg[1]) %>% 
+    select(-c("ID", "Stage", "SampleID"))
+  
+  per <- apply(amf_delta, 2, function(x, pf){
+  
+    # x <- amf_delta$Arginine
+    # pf <- prf_delta
+    dat <- data.frame(value = x, pf) %>% na.omit()
+    if (is.factor(dat$value)){
+      datphe <- dat$value  
+    }else{
+      datphe <- dat$value
+    }
+    
+    if (length(datphe) == 0 | unique(datphe) == 1) {
+        res <- data.frame(length(datphe), rep(NA, 6))
+        next
+    }
+      
+    if (length(unique(datphe)) < 6) {
+        datphe <- as.factor(datphe)
+    } 
+      
+    # distance 
+    datprf <- dat[, -1, F] 
+    dis <- vegdist(datprf, method = "bray")
+      
+    set.seed(123)
+    ad <- adonis(dis ~ datphe, permutations = 1000)
+    tmp <- as.data.frame(ad$aov.tab) %>% slice(1)
+    res <- c(length(datphe), as.numeric(tmp[, c(1:6)]))
+
+    return(res)
+    
+    }, phe_prf) %>% t() %>% data.frame()
+    
+  colnames(per) <- c("SumsOfSample", "Df", "SumsOfSqs", 
+                       "MeanSqs", "F.Model", "R2", "Pr(>F)")
+  
+  per$FDR <- p.adjust(per$`Pr(>F)`, method = "BH")
+  
+  return(per)
+}
+
+# baseline Species and amino acids
+base.spf.amf.per <- perFun_aa(spf)
+#write.csv(base.spf.amf.per, "../datset/correlation/base.spf.amf.delta.csv")
+```
