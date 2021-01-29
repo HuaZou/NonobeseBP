@@ -95,6 +95,7 @@ PermProf <- function(x, y) {
 }
 
 before.per <- PermProf(before.grp, gsf)
+DT::datatable(before.per)
 ```
 
 

@@ -65,9 +65,9 @@ PCoAFun <- function(cfg) {
          grp, fill = grp.col, box.lty = 0, cex = .8)
 }
 
-#pdf("../pdf/Figure4A.pdf", width = 4, height = 4)
+pdf("../datset/pdf/Figure4A.pdf", width = 4, height = 4)
 PCoAFun("Before")
-#dev.off()
+dev.off()
 ```
 
 ## comparsion between two enterotypes before intervention
@@ -161,7 +161,7 @@ prePlot <- function(x){
 ### Figure4B
 ```{r}
 prePlot(amf)
-#ggsave("../pdf/Figure4B.pdf", width = 6, height = 4, dpi = 600)
+ggsave("../datset/pdf/Figure4B.pdf", prePlot(amf), width = 6, height = 4, dpi = 600)
 ```
 
 ```{r}
@@ -228,8 +228,10 @@ testfun <- function(y){
 }
 
 ba.aa.t <- testfun(amf)
-#write.csv(ba.aa.t, "../datset/compare/aa.stage.wilcox.csv", row.names = F)
+write.csv(ba.aa.t, "../datset/compare/aa.stage.wilcox.csv", row.names = F)
 ```
+
+
 ### Figure 4C
 ```{r}
 PCAFun <- function(y){
@@ -295,7 +297,7 @@ PCAFun <- function(y){
 }
 
 PCAFun(amf)
-#ggsave("../pdf/Figure4C.pdf", width = 6, height = 4, dpi = 300)
+ggsave("../datset/pdf/Figure4C.pdf", PCAFun(amf), width = 6, height = 4, dpi = 300)
 ```
 
 ### Figure 4D 
@@ -418,7 +420,7 @@ postPlot <- function(x){
 }
 
 postPlot(amf)
-#ggsave("../pdf/Figure4D.pdf", width = 6, height = 4, dpi = 600)
+ggsave("../datset/pdf/Figure4D.pdf", postPlot(amf), width = 6, height = 4, dpi = 600)
 ```
 
 ### Permanova
@@ -560,5 +562,5 @@ perFun_aa <- function(y) {
 
 # baseline Species and amino acids
 base.spf.amf.per <- perFun_aa(spf)
-#write.csv(base.spf.amf.per, "../datset/correlation/base.spf.amf.delta.csv")
+write.csv(base.spf.amf.per, "../datset/correlation/base.spf.amf.delta.csv")
 ```

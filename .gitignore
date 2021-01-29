@@ -4,6 +4,3 @@
 *.Rhistory
 *.log
 *tmp*
-*pdf
-*pdf/
-*Fig*/

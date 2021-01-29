@@ -350,7 +350,7 @@ sp.cc <- visplot(sp.res$res)
 cowplot::plot_grid(sp.mk, sp.cc,
   ncol = 2, align = "h", axis = "b",
   labels = c("A", "B"))
-#ggsave("../pdf/Figure5.pdf", width = 8, height = 4, dpi = 300)
+ggsave("../datset/pdf/Figure5.pdf", width = 8, height = 4, dpi = 300)
 ```
 
 ### amino acids
@@ -362,7 +362,7 @@ aa.res <- Feature_aa(grp)
 ```{r}
 bmi.res <- Feature_bmi("glm", 41, grp)
 visplot(bmi.res)
-ggsave("../pdf/SFigure2.pdf", width = 5, height = 4, dpi = 300)
+ggsave("../datset/pdf/SFigure2.pdf", width = 5, height = 4, dpi = 300)
 ```
 
 ### cbind species and amino acids
@@ -374,6 +374,6 @@ all.cc <- visplot(all.res$res)
 cowplot::plot_grid(all.mk, all.cc,
   ncol = 2, align = "h", axis = "b",
   labels = c("A", "B"))
-ggsave("../pdf/Figure5.pdf", width = 9, height = 4, dpi = 300)
+ggsave("../datset/pdf/Figure5.pdf", width = 9, height = 4, dpi = 300)
 ```
 

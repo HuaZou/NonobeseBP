@@ -55,7 +55,7 @@ box.bmi.before <- ggplot(phen %>% filter(Stage=="Before"), aes(x=Group, y=BMI, f
       legend.position=c(1, 0))
 
 box.bmi.before
-#ggsave("../pdf/Figure2B.pdf", width = 3, height = 2.5, dpi = 600)
+ggsave("../datset/pdf/Figure2B.pdf", width = 3, height = 2.5, dpi = 600)
 ```
 
 ### Figure2CD
@@ -121,5 +121,5 @@ cowplot::plot_grid(box.bmi.g, bar.bmi.p,
   ncol = 2, align = "h", axis = "b",
   labels = c("A", "B"))
 
-#ggsave("../pdf/Figure2CD.pdf", width = 6, height = 2.5, dpi = 600)
+ggsave("../datset/pdf/Figure2CD.pdf", width = 6, height = 2.5, dpi = 600)
 ```

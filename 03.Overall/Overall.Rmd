@@ -76,7 +76,7 @@ perFun <- function(x, y) {
           t() %>% data.frame()
   per <- apply(phe %>% select(-one_of("SampleID")), 2, function(a, pf){
     dat <- data.frame(value = a, pf)
-      datphe <- dat$value %>% varhandle::unfactor() 
+      datphe <- dat$value# %>% varhandle::unfactor() 
       if (length(datphe) == 0 | unique(datphe) == 1) {
         res <- data.frame(length(datphe), rep(NA, 6))
         next
@@ -99,7 +99,7 @@ perFun <- function(x, y) {
   return(per)
 }
 
-perFun(phen, spf)
+DT::datatable(perFun(phen, spf))
 ```
 
 ```{r}
@@ -128,7 +128,7 @@ perFun_delta <- function(y) {
     # pf <- prf_delta
     dat <- data.frame(value = x, pf) %>% na.omit()
     if (is.factor(dat$value)){
-      datphe <- dat$value %>% varhandle::unfactor() 
+      datphe <- dat$value# %>% varhandle::unfactor() 
     }else{
       datphe <- dat$value
     }
@@ -161,8 +161,7 @@ perFun_delta <- function(y) {
   return(per)
 }
 
-perFun_delta(gsf)
-perFun_delta(spf)
+DT::datatable(perFun_delta(spf))
 ```
 
 ### Figure3A
@@ -292,14 +291,14 @@ ScorePCoA <- function(y, num){
 
 PCoA <- PCoABPL(phen, sp.dis)
 PCoA$circle
-ggsave("../pdf/Fig3A.pdf", width = 6, height = 5, dpi = 300)
+ggsave("../datset/pdf/Fig3A.pdf", PCoA$circle, width = 6, height = 5, dpi = 300)
 
 pcoa1 <- ScorePCoA(PCoA$score, 1)
 pcoa2 <- ScorePCoA(PCoA$score, 2)
 
 cowplot::plot_grid(pcoa1, pcoa2,
   ncol = 2, align = "h", axis = "b")
-ggsave("../pdf/Fig3A12.pdf", width = 4, height = 2, dpi = 300)
+ggsave("../datset/pdf/Fig3A12.pdf", width = 4, height = 2, dpi = 300)
 ```
 
 ### Figure BC
@@ -368,11 +367,10 @@ BetaFun <- function(y, num){
 
 beta.ge <- BetaFun(ge.dis, 1)
 beta.sp <- BetaFun(sp.dis, 2)
-#beta.ko <- BetaFun(ko.dis, 3)
 cowplot::plot_grid(beta.ge, beta.sp,
   ncol = 2, align = "h", axis = "b",
   labels = c("B", "C"))
-#ggsave("../pdf/F3BC.pdf", width = 4, height = 2.5, dpi = 300)
+ggsave("../datset/pdf/F3BC.pdf", width = 4, height = 2.5, dpi = 300)
 ```
 
 ### Figure DE
@@ -422,10 +420,9 @@ AlphaFun <- function(y, num){
 
 index.ge <- AlphaFun(ge.idx, 1)
 index.sp <- AlphaFun(sp.idx, 2)
-#index.ko <- AlphaFun(ko.idx, 3)
 
 cowplot::plot_grid(index.ge, index.sp,
   ncol = 2, align = "h", axis = "b",
   labels = c("D", "E"))
-#ggsave("../pdf/F3DE.pdf", width = 4, height = 2.5, dpi = 300)
+ggsave("../datset/pdf/F3DE.pdf", width = 4, height = 2.5, dpi = 300)
 ```
